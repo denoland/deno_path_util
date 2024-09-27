@@ -1,0 +1,18 @@
+[package]
+name = "deno_path_util"
+description = "Path utilities used in Deno"
+version = "0.0.1"
+edition = "2021"
+authors = ["the Deno authors"]
+license = "MIT"
+repository = "https://github.com/denoland/deno_path_util"
+
+[features]
+
+[dependencies]
+percent-encoding = "2.3.0"
+thiserror = "1.0.61"
+url = { version = "2.3.1" }
+
+[dev-dependencies]
+pretty_assertions = "1.4.0"
