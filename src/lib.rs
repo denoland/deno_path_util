@@ -60,26 +60,30 @@ fn url_to_file_path_inner(url: &Url) -> Result<PathBuf, ()> {
 #[cfg(any(unix, windows, target_os = "redox", target_os = "wasi"))]
 fn url_to_file_path_real(url: &Url) -> Result<PathBuf, ()> {
   if cfg!(windows) {
-    match url.to_file_path() {
-      Ok(path) => Ok(path),
-      Err(()) => {
-        // This might be a unix-style path which is used in the tests even on Windows.
-        // Attempt to see if we can convert it to a `PathBuf`. This code should be removed
-        // once/if https://github.com/servo/rust-url/issues/730 is implemented.
-        if url.scheme() == "file"
-          && url.host().is_none()
-          && url.port().is_none()
-          && url.path_segments().is_some()
-        {
-          let path_str = url.path();
-          match String::from_utf8(
-            percent_encoding::percent_decode(path_str.as_bytes()).collect(),
-          ) {
-            Ok(path_str) => Ok(PathBuf::from(path_str)),
-            Err(_) => Err(()),
+    if url.host().is_some() {
+      Err(())
+    } else {
+      match url.to_file_path() {
+        Ok(path) => Ok(path),
+        Err(()) => {
+          // This might be a unix-style path which is used in the tests even on Windows.
+          // Attempt to see if we can convert it to a `PathBuf`. This code should be removed
+          // once/if https://github.com/servo/rust-url/issues/730 is implemented.
+          if url.scheme() == "file"
+            && url.host().is_none()
+            && url.port().is_none()
+            && url.path_segments().is_some()
+          {
+            let path_str = url.path();
+            match String::from_utf8(
+              percent_encoding::percent_decode(path_str.as_bytes()).collect(),
+            ) {
+              Ok(path_str) => Ok(PathBuf::from(path_str)),
+              Err(_) => Err(()),
+            }
+          } else {
+            Err(())
           }
-        } else {
-          Err(())
         }
       }
     }
@@ -329,9 +333,18 @@ mod tests {
       "/dir/test test/test.txt",
     );
 
+    assert_no_panic_specifier_to_file_path("file:/");
+    assert_no_panic_specifier_to_file_path("file://");
+    assert_no_panic_specifier_to_file_path("file://asdf/");
+    assert_no_panic_specifier_to_file_path("file://asdf/66666/a.ts");
+
     fn run_success_test(specifier: &str, expected_path: &str) {
       let result = url_to_file_path(&Url::parse(specifier).unwrap()).unwrap();
       assert_eq!(result, PathBuf::from(expected_path));
+    }
+
+    fn assert_no_panic_specifier_to_file_path(specifier: &str) {
+      let _result = url_to_file_path(&Url::parse(specifier).unwrap());
     }
   }
 
