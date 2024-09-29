@@ -31,7 +31,7 @@ pub fn specifier_parent(specifier: &Url) -> Url {
 }
 
 #[derive(Debug, Error)]
-#[error("Could not convert url to file path.\n  Url: {0}")]
+#[error("Could not convert URL to file path.\n  URL: {0}")]
 pub struct UrlToFilePathError(pub Url);
 
 /// Attempts to convert a url to a file path. By default, uses the Url
