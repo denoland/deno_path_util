@@ -4,19 +4,20 @@
 #![deny(clippy::print_stdout)]
 #![deny(clippy::unused_async)]
 
+use std::io::ErrorKind;
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 use thiserror::Error;
 use url::Url;
 
-/// Gets the parent of this module specifier.
-pub fn specifier_parent(specifier: &Url) -> Url {
-  let mut specifier = specifier.clone();
-  // don't use specifier.segments() because it will strip the leading slash
-  let mut segments = specifier.path().split('/').collect::<Vec<_>>();
+/// Gets the parent of this url.
+pub fn url_parent(url: &Url) -> Url {
+  let mut url = url.clone();
+  // don't use url.segments() because it will strip the leading slash
+  let mut segments = url.path().split('/').collect::<Vec<_>>();
   if segments.iter().all(|s| s.is_empty()) {
-    return specifier;
+    return url;
   }
   if let Some(last) = segments.last() {
     if last.is_empty() {
@@ -24,29 +25,27 @@ pub fn specifier_parent(specifier: &Url) -> Url {
     }
     segments.pop();
     let new_path = format!("{}/", segments.join("/"));
-    specifier.set_path(&new_path);
+    url.set_path(&new_path);
   }
-  specifier
+  url
 }
 
 #[derive(Debug, Error)]
-#[error("Could not convert specifier to file path.\n  Specifier: {0}")]
-pub struct SpecifierToFilePathError(pub Url);
+#[error("Could not convert URL to file path.\n  URL: {0}")]
+pub struct UrlToFilePathError(pub Url);
 
 /// Attempts to convert a url to a file path. By default, uses the Url
 /// crate's `to_file_path()` method, but falls back to try and resolve unix-style
 /// paths on Windows.
-pub fn url_to_file_path(
-  specifier: &Url,
-) -> Result<PathBuf, SpecifierToFilePathError> {
-  let result = if specifier.scheme() != "file" {
+pub fn url_to_file_path(url: &Url) -> Result<PathBuf, UrlToFilePathError> {
+  let result = if url.scheme() != "file" {
     Err(())
   } else {
-    url_to_file_path_inner(specifier)
+    url_to_file_path_inner(url)
   };
   match result {
     Ok(path) => Ok(path),
-    Err(()) => Err(SpecifierToFilePathError(specifier.clone())),
+    Err(()) => Err(UrlToFilePathError(url.clone())),
   }
 }
 
@@ -97,8 +96,8 @@ fn url_to_file_path_real(url: &Url) -> Result<PathBuf, ()> {
   not(any(unix, windows, target_os = "redox", target_os = "wasi"))
 ))]
 fn url_to_file_path_wasm(url: &Url) -> Result<PathBuf, ()> {
-  fn is_windows_path_segment(specifier: &str) -> bool {
-    let mut chars = specifier.chars();
+  fn is_windows_path_segment(url: &str) -> bool {
+    let mut chars = url.chars();
 
     let first_char = chars.next();
     if first_char.is_none() || !first_char.unwrap().is_ascii_alphabetic() {
@@ -174,20 +173,27 @@ pub fn normalize_path<P: AsRef<Path>>(path: P) -> PathBuf {
   inner(path.as_ref())
 }
 
+#[derive(Debug, Error)]
+#[error("Could not convert path to URL.\n  Path: {0}")]
+pub struct PathToUrlError(pub PathBuf);
+
 #[allow(clippy::result_unit_err)]
-pub fn url_from_file_path(path: &Path) -> Result<Url, ()> {
+pub fn url_from_file_path(path: &Path) -> Result<Url, PathToUrlError> {
   #[cfg(any(unix, windows, target_os = "redox", target_os = "wasi"))]
-  return Url::from_file_path(path);
+  return Url::from_file_path(path)
+    .map_err(|()| PathToUrlError(path.to_path_buf()));
   #[cfg(not(any(unix, windows, target_os = "redox", target_os = "wasi")))]
-  url_from_file_path_wasm(path)
+  url_from_file_path_wasm(path).map_err(|()| PathToUrlError(path.to_path_buf()))
 }
 
 #[allow(clippy::result_unit_err)]
-pub fn url_from_directory_path(path: &Path) -> Result<Url, ()> {
+pub fn url_from_directory_path(path: &Path) -> Result<Url, PathToUrlError> {
   #[cfg(any(unix, windows, target_os = "redox", target_os = "wasi"))]
-  return Url::from_directory_path(path);
+  return Url::from_directory_path(path)
+    .map_err(|()| PathToUrlError(path.to_path_buf()));
   #[cfg(not(any(unix, windows, target_os = "redox", target_os = "wasi")))]
   url_from_directory_path_wasm(path)
+    .map_err(|()| PathToUrlError(path.to_path_buf()))
 }
 
 #[cfg(any(
@@ -304,12 +310,48 @@ pub fn strip_unc_prefix(path: PathBuf) -> PathBuf {
   }
 }
 
+/// Canonicalizes a path which might be non-existent by going up the
+/// ancestors until it finds a directory that exists, canonicalizes
+/// that path, then adds back the remaining path components.
+///
+/// Note: When using this, you should be aware that a symlink may
+/// subsequently be created along this path by some other code.
+pub fn canonicalize_path_maybe_not_exists(
+  path: &Path,
+  canonicalize: &impl Fn(&Path) -> std::io::Result<PathBuf>,
+) -> std::io::Result<PathBuf> {
+  let path = normalize_path(path);
+  let mut path = path.as_path();
+  let mut names_stack = Vec::new();
+  loop {
+    match canonicalize(path) {
+      Ok(mut canonicalized_path) => {
+        for name in names_stack.into_iter().rev() {
+          canonicalized_path = canonicalized_path.join(name);
+        }
+        return Ok(canonicalized_path);
+      }
+      Err(err) if err.kind() == ErrorKind::NotFound => {
+        names_stack.push(match path.file_name() {
+          Some(name) => name.to_owned(),
+          None => return Err(err),
+        });
+        path = match path.parent() {
+          Some(parent) => parent,
+          None => return Err(err),
+        };
+      }
+      Err(err) => return Err(err),
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
 
   #[test]
-  fn test_specifier_parent() {
+  fn test_url_parent() {
     run_test("file:///", "file:///");
     run_test("file:///test", "file:///");
     run_test("file:///test/", "file:///");
@@ -317,14 +359,14 @@ mod tests {
     run_test("file:///test/other.txt", "file:///test/");
     run_test("file:///test/other/", "file:///test/");
 
-    fn run_test(specifier: &str, expected: &str) {
-      let result = specifier_parent(&Url::parse(specifier).unwrap());
+    fn run_test(url: &str, expected: &str) {
+      let result = url_parent(&Url::parse(url).unwrap());
       assert_eq!(result.to_string(), expected);
     }
   }
 
   #[test]
-  fn test_specifier_to_file_path() {
+  fn test_url_to_file_path() {
     run_success_test("file:///", "/");
     run_success_test("file:///test", "/test");
     run_success_test("file:///dir/test/test.txt", "/dir/test/test.txt");
@@ -333,18 +375,18 @@ mod tests {
       "/dir/test test/test.txt",
     );
 
-    assert_no_panic_specifier_to_file_path("file:/");
-    assert_no_panic_specifier_to_file_path("file://");
-    assert_no_panic_specifier_to_file_path("file://asdf/");
-    assert_no_panic_specifier_to_file_path("file://asdf/66666/a.ts");
+    assert_no_panic_url_to_file_path("file:/");
+    assert_no_panic_url_to_file_path("file://");
+    assert_no_panic_url_to_file_path("file://asdf/");
+    assert_no_panic_url_to_file_path("file://asdf/66666/a.ts");
 
-    fn run_success_test(specifier: &str, expected_path: &str) {
-      let result = url_to_file_path(&Url::parse(specifier).unwrap()).unwrap();
+    fn run_success_test(url: &str, expected_path: &str) {
+      let result = url_to_file_path(&Url::parse(url).unwrap()).unwrap();
       assert_eq!(result, PathBuf::from(expected_path));
     }
 
-    fn assert_no_panic_specifier_to_file_path(specifier: &str) {
-      let _result = url_to_file_path(&Url::parse(specifier).unwrap());
+    fn assert_no_panic_url_to_file_path(url: &str) {
+      let _result = url_to_file_path(&Url::parse(url).unwrap());
     }
   }
 
@@ -461,6 +503,23 @@ mod tests {
     fn run_test(input: &str, expected: &str) {
       assert_eq!(
         super::strip_unc_prefix(PathBuf::from(input)),
+        PathBuf::from(expected)
+      );
+    }
+  }
+
+  #[cfg(windows)]
+  #[test]
+  fn test_normalize_path() {
+    use super::*;
+
+    run_test("C:\\test\\./file.txt", "C:\\test\\file.txt");
+    run_test("C:\\test\\../other/file.txt", "C:\\other\\file.txt");
+    run_test("C:\\test\\../other\\file.txt", "C:\\other\\file.txt");
+
+    fn run_test(input: &str, expected: &str) {
+      assert_eq!(
+        normalize_path(PathBuf::from(input)),
         PathBuf::from(expected)
       );
     }
