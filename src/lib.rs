@@ -59,10 +59,6 @@ fn url_to_file_path_inner(url: &Url) -> Result<PathBuf, ()> {
 #[cfg(any(unix, windows, target_os = "redox", target_os = "wasi"))]
 fn url_to_file_path_real(url: &Url) -> Result<PathBuf, ()> {
   if cfg!(windows) {
-    if url.host().is_some() {
-      return Err(());
-    }
-
     match url.to_file_path() {
       Ok(path) => Ok(path),
       Err(()) => {
