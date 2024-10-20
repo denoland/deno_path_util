@@ -258,6 +258,19 @@ fn url_from_file_path_wasm(path: &Path) -> Result<Url, ()> {
   }
 }
 
+/// Gets if the provided url has the specified extension, ignoring case.
+pub fn url_has_extension(specifier: &Url, searching_ext: &str) -> bool {
+  let Some((_, ext)) = specifier.path().rsplit_once('.') else {
+    return false;
+  };
+  let searching_ext = searching_ext.strip_prefix('.').unwrap_or(searching_ext);
+  debug_assert!(!searching_ext.contains('.')); // exts like .d.ts are not implemented here
+  if ext.len() != searching_ext.len() {
+    return false;
+  }
+  ext.eq_ignore_ascii_case(searching_ext)
+}
+
 #[cfg(not(windows))]
 #[inline]
 pub fn strip_unc_prefix(path: PathBuf) -> PathBuf {
@@ -465,6 +478,18 @@ mod tests {
 
     assert_eq!(convert("/a/b/c"), "file:///a/b/c/");
     assert_eq!(convert("D:\\test\\other"), "file:///D:/test/other/");
+  }
+
+  #[test]
+  fn test_url_has_extension() {
+    fn get(specifier: &str, ext: &str) -> bool {
+      url_has_extension(&Url::parse(specifier).unwrap(), ext)
+    }
+
+    assert!(get("file:///a/b/c.ts", "ts"));
+    assert!(get("file:///a/b/c.ts", ".ts"));
+    assert!(!get("file:///a/b/c.ts", ".cts"));
+    assert!(get("file:///a/b/c.CtS", ".cts"));
   }
 
   #[cfg(windows)]
