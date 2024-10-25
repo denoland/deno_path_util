@@ -493,6 +493,8 @@ mod tests {
     assert!(!get("file:///a/b/c.ts", ".cts"));
     assert!(get("file:///a/b/c.CtS", ".cts"));
     assert!(get("https://localhost/file.cts", ".cts"));
+    assert!(!get("https://localhost/filects", ".cts"));
+    assert!(!get("https://localhost/cts", ".cts"));
     // no because this is a hidden file and not an extension
     assert!(!get("file:///a/b/.CtS", ".cts"));
     assert!(!get("https://localhost/.cts", ".cts"));
