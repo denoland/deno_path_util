@@ -260,15 +260,17 @@ fn url_from_file_path_wasm(path: &Path) -> Result<Url, ()> {
 
 /// Gets if the provided url has the specified extension, ignoring case.
 pub fn url_has_extension(specifier: &Url, searching_ext: &str) -> bool {
-  let Some((_, ext)) = specifier.path().rsplit_once('.') else {
-    return false;
-  };
   let searching_ext = searching_ext.strip_prefix('.').unwrap_or(searching_ext);
   debug_assert!(!searching_ext.contains('.')); // exts like .d.ts are not implemented here
-  if ext.len() != searching_ext.len() {
+  let path = specifier.path();
+  if path.len() < searching_ext.len() {
     return false;
   }
-  ext.eq_ignore_ascii_case(searching_ext)
+  let ext_pos = path.len() - searching_ext.len();
+  let (start_path, end_path) = path.split_at(ext_pos);
+  end_path.eq_ignore_ascii_case(searching_ext)
+    && start_path.ends_with('.')
+    && !start_path.ends_with("/.")
 }
 
 #[cfg(not(windows))]
@@ -490,6 +492,10 @@ mod tests {
     assert!(get("file:///a/b/c.ts", ".ts"));
     assert!(!get("file:///a/b/c.ts", ".cts"));
     assert!(get("file:///a/b/c.CtS", ".cts"));
+    assert!(get("https://localhost/file.cts", ".cts"));
+    // no because this is a hidden file and not an extension
+    assert!(!get("file:///a/b/.CtS", ".cts"));
+    assert!(!get("https://localhost/.cts", ".cts"));
   }
 
   #[cfg(windows)]
