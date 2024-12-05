@@ -93,6 +93,7 @@ fn url_to_file_path_real(url: &Url) -> Result<PathBuf, ()> {
   test,
   not(any(unix, windows, target_os = "redox", target_os = "wasi"))
 ))]
+#[allow(clippy::unnecessary_wraps)]
 fn url_to_file_path_wasm(url: &Url) -> Result<PathBuf, ()> {
   fn is_windows_path_segment(url: &str) -> bool {
     let mut chars = url.chars();
