@@ -11,8 +11,9 @@ repository = "https://github.com/denoland/deno_path_util"
 
 [dependencies]
 percent-encoding = "2.3.0"
-thiserror = "1.0.61"
-url = { version = "2.3.1" }
+thiserror = "2"
+deno_error = "0.5.2"
+url = { version = "2.5.1" }
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"

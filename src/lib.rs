@@ -3,6 +3,7 @@
 #![deny(clippy::print_stderr)]
 #![deny(clippy::print_stdout)]
 #![deny(clippy::unused_async)]
+#![deny(clippy::unnecessary_wraps)]
 
 use std::io::ErrorKind;
 use std::path::Component;
@@ -30,7 +31,8 @@ pub fn url_parent(url: &Url) -> Url {
   url
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, deno_error::JsError)]
+#[class(uri)]
 #[error("Could not convert URL to file path.\n  URL: {0}")]
 pub struct UrlToFilePathError(pub Url);
 
@@ -91,6 +93,7 @@ fn url_to_file_path_real(url: &Url) -> Result<PathBuf, ()> {
   test,
   not(any(unix, windows, target_os = "redox", target_os = "wasi"))
 ))]
+#[allow(clippy::unnecessary_wraps)]
 fn url_to_file_path_wasm(url: &Url) -> Result<PathBuf, ()> {
   fn is_windows_path_segment(url: &str) -> bool {
     let mut chars = url.chars();
@@ -169,7 +172,8 @@ pub fn normalize_path<P: AsRef<Path>>(path: P) -> PathBuf {
   inner(path.as_ref())
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, deno_error::JsError)]
+#[class(uri)]
 #[error("Could not convert path to URL.\n  Path: {0}")]
 pub struct PathToUrlError(pub PathBuf);
 
