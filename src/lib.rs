@@ -5,12 +5,15 @@
 #![deny(clippy::unused_async)]
 #![deny(clippy::unnecessary_wraps)]
 
-use std::io::ErrorKind;
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
+use sys_traits::SystemRandom;
 use thiserror::Error;
 use url::Url;
+
+mod fs;
+pub use fs::*;
 
 /// Gets the parent of this url.
 pub fn url_parent(url: &Url) -> Url {
@@ -310,40 +313,18 @@ pub fn strip_unc_prefix(path: PathBuf) -> PathBuf {
   }
 }
 
-/// Canonicalizes a path which might be non-existent by going up the
-/// ancestors until it finds a directory that exists, canonicalizes
-/// that path, then adds back the remaining path components.
-///
-/// Note: When using this, you should be aware that a symlink may
-/// subsequently be created along this path by some other code.
-pub fn canonicalize_path_maybe_not_exists(
-  path: &Path,
-  canonicalize: &impl Fn(&Path) -> std::io::Result<PathBuf>,
-) -> std::io::Result<PathBuf> {
-  let path = normalize_path(path);
-  let mut path = path.as_path();
-  let mut names_stack = Vec::new();
-  loop {
-    match canonicalize(path) {
-      Ok(mut canonicalized_path) => {
-        for name in names_stack.into_iter().rev() {
-          canonicalized_path = canonicalized_path.join(name);
-        }
-        return Ok(canonicalized_path);
-      }
-      Err(err) if err.kind() == ErrorKind::NotFound => {
-        names_stack.push(match path.file_name() {
-          Some(name) => name.to_owned(),
-          None => return Err(err),
-        });
-        path = match path.parent() {
-          Some(parent) => parent,
-          None => return Err(err),
-        };
-      }
-      Err(err) => return Err(err),
-    }
-  }
+pub fn get_atomic_path(env: &dyn SystemRandom, path: &Path) -> PathBuf {
+  let rand = gen_rand_path_component(env);
+  let extension = format!("{rand}.tmp");
+  path.with_extension(extension)
+}
+
+fn gen_rand_path_component(env: &dyn SystemRandom) -> String {
+  use std::fmt::Write;
+  (0..4).fold(String::with_capacity(8), |mut output, _| {
+    write!(&mut output, "{:02x}", env.sys_random_u8().unwrap()).unwrap();
+    output
+  })
 }
 
 #[cfg(test)]
