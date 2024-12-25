@@ -9,10 +9,10 @@ use std::path::PathBuf;
 use sys_traits::FsCanonicalize;
 use sys_traits::FsCreateDirAll;
 use sys_traits::FsFileSetPermissions;
+use sys_traits::FsMetadata;
 use sys_traits::FsOpen;
 use sys_traits::FsRemoveFile;
 use sys_traits::FsRename;
-use sys_traits::FsSymlinkMetadata;
 use sys_traits::OpenOptions;
 use sys_traits::SystemRandom;
 use sys_traits::ThreadSleep;
@@ -58,7 +58,7 @@ pub fn canonicalize_path_maybe_not_exists(
 
 pub fn atomic_write_file_with_retries<
   TSys: FsCreateDirAll
-    + FsSymlinkMetadata
+    + FsMetadata
     + FsOpen
     + FsRemoveFile
     + FsRename
@@ -94,12 +94,7 @@ pub fn atomic_write_file_with_retries<
 /// This also handles creating the directory if a NotFound error
 /// occurs.
 pub fn atomic_write_file<
-  TSys: FsCreateDirAll
-    + FsSymlinkMetadata
-    + FsOpen
-    + FsRemoveFile
-    + FsRename
-    + SystemRandom,
+  TSys: FsCreateDirAll + FsMetadata + FsOpen + FsRemoveFile + FsRename + SystemRandom,
 >(
   sys: &TSys,
   file_path: &Path,
