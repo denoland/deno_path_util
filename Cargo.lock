@@ -86,17 +86,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "getrandom"
-version = "0.2.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4567c8db10ae91089c99af84c68c38da3ec2f087c3f82960bcdbf3656b6f4d7"
-dependencies = [
- "cfg-if",
- "libc",
- "wasi",
-]
-
-[[package]]
 name = "icu_collections"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -407,11 +396,8 @@ dependencies = [
 
 [[package]]
 name = "sys_traits"
-version = "0.1.0-alpha.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f89e1a91983850cb255655891044fc2d8bc4e402b3bf1e0fc73e2257d0429ea"
+version = "0.1.0-alpha.4"
 dependencies = [
- "getrandom",
  "js-sys",
  "parking_lot",
  "wasm-bindgen",
@@ -475,12 +461,6 @@ name = "utf8_iter"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6c140620e7ffbb22c2dee59cafe6084a59b5ffc27a8859a5f0d494b5d52b6be"
-
-[[package]]
-name = "wasi"
-version = "0.11.0+wasi-snapshot-preview1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
 
 [[package]]
 name = "wasm-bindgen"
