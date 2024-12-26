@@ -27,8 +27,8 @@ use crate::normalize_path;
 /// Note: When using this, you should be aware that a symlink may
 /// subsequently be created along this path by some other code.
 pub fn canonicalize_path_maybe_not_exists(
-  path: &Path,
   sys: &impl FsCanonicalize,
+  path: &Path,
 ) -> std::io::Result<PathBuf> {
   let path = normalize_path(path);
   let mut path = path.as_path();
@@ -179,10 +179,10 @@ mod test {
     sys.fs_create_dir_all("/a/b/c").unwrap();
     sys.env_set_current_dir("/a/b").unwrap();
     let path =
-      canonicalize_path_maybe_not_exists(&PathBuf::from("./c"), &sys).unwrap();
+      canonicalize_path_maybe_not_exists(&sys, &PathBuf::from("./c")).unwrap();
     assert_eq!(path, PathBuf::from("/a/b/c"));
     let path =
-      canonicalize_path_maybe_not_exists(&PathBuf::from("./c/d/e"), &sys)
+      canonicalize_path_maybe_not_exists(&sys, &PathBuf::from("./c/d/e"))
         .unwrap();
     assert_eq!(path, PathBuf::from("/a/b/c/d/e"));
   }

@@ -18,7 +18,7 @@ url = "2.5.1"
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
-sys_traits = { version = "0.1.0-alpha.4", features = ["memory"] }
+sys_traits = { version = "0.1.0-alpha.5", features = ["memory"] }
 
 [patch.crates-io]
 sys_traits = { path = "../sys_traits" }
