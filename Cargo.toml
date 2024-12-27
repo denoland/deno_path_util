@@ -26,4 +26,3 @@ members = ["."]
 
 [workspace.dependencies]
 sys_traits = "0.1.0"
-
