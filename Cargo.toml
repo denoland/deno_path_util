@@ -12,8 +12,17 @@ repository = "https://github.com/denoland/deno_path_util"
 [dependencies]
 percent-encoding = "2.3.0"
 thiserror = "2"
+sys_traits.workspace = true
 deno_error = "0.5.2"
-url = { version = "2.5.1" }
+url = "2.5.1"
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
+sys_traits = { workspace = true, features = ["getrandom", "memory", "real"] }
+tempfile = "3.4.0"
+
+[workspace]
+members = ["."]
+
+[workspace.dependencies]
+sys_traits = "0.1.0"
