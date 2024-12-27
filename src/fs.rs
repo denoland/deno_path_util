@@ -168,9 +168,12 @@ mod test {
   use std::path::PathBuf;
 
   use sys_traits::impls::InMemorySys;
+  use sys_traits::impls::RealSys;
   use sys_traits::EnvSetCurrentDir;
   use sys_traits::FsCreateDirAll;
+  use sys_traits::FsRead;
 
+  use super::atomic_write_file_with_retries;
   use super::canonicalize_path_maybe_not_exists;
 
   #[test]
@@ -185,5 +188,20 @@ mod test {
       canonicalize_path_maybe_not_exists(&sys, &PathBuf::from("./c/d/e"))
         .unwrap();
     assert_eq!(path, PathBuf::from("/a/b/c/d/e"));
+  }
+
+  #[test]
+  fn test_atomic_write_file() {
+    let sys = RealSys::default();
+    let temp_dir = tempfile::tempdir().unwrap();
+    let path = temp_dir.path().join("a/b/c");
+    atomic_write_file_with_retries(&sys, &path, b"data", 0o644).unwrap();
+    assert_eq!(sys.fs_read_to_string(&path).unwrap(), "data");
+    #[cfg(unix)]
+    {
+      use std::os::unix::fs::PermissionsExt;
+      let file = std::fs::metadata(path).unwrap();
+      assert_eq!(file.permissions().mode(), 0o100644);
+    }
   }
 }

@@ -313,16 +313,16 @@ pub fn strip_unc_prefix(path: PathBuf) -> PathBuf {
   }
 }
 
-pub fn get_atomic_path(env: &dyn SystemRandom, path: &Path) -> PathBuf {
-  let rand = gen_rand_path_component(env);
+pub fn get_atomic_path(sys: &impl SystemRandom, path: &Path) -> PathBuf {
+  let rand = gen_rand_path_component(sys);
   let extension = format!("{rand}.tmp");
   path.with_extension(extension)
 }
 
-fn gen_rand_path_component(env: &dyn SystemRandom) -> String {
+fn gen_rand_path_component(sys: &impl SystemRandom) -> String {
   use std::fmt::Write;
   (0..4).fold(String::with_capacity(8), |mut output, _| {
-    write!(&mut output, "{:02x}", env.sys_random_u8().unwrap()).unwrap();
+    write!(&mut output, "{:02x}", sys.sys_random_u8().unwrap()).unwrap();
     output
   })
 }
@@ -504,5 +504,15 @@ mod tests {
         PathBuf::from(expected)
       );
     }
+  }
+
+  #[test]
+  fn test_atomic_path() {
+    let sys = sys_traits::impls::InMemorySys::default();
+    sys.set_seed(Some(10));
+    let path = Path::new("/a/b/c.txt");
+    let atomic_path = get_atomic_path(&sys, path);
+    assert_eq!(atomic_path.parent().unwrap(), path.parent().unwrap());
+    assert_eq!(atomic_path.file_name().unwrap(), "c.3d3d3d3d.tmp");
   }
 }

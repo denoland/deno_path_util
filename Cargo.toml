@@ -18,7 +18,8 @@ url = "2.5.1"
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
-sys_traits = { workspace = true, features = ["memory"] }
+sys_traits = { workspace = true, features = ["getrandom", "memory", "real"] }
+tempfile = "3.4.0"
 
 [workspace]
 members = ["."]
