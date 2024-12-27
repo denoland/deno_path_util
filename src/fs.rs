@@ -8,7 +8,6 @@ use std::path::PathBuf;
 
 use sys_traits::FsCanonicalize;
 use sys_traits::FsCreateDirAll;
-use sys_traits::FsFileSetPermissions;
 use sys_traits::FsMetadata;
 use sys_traits::FsOpen;
 use sys_traits::FsRemoveFile;
