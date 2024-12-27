@@ -12,8 +12,7 @@ use sys_traits::SystemRandom;
 use thiserror::Error;
 use url::Url;
 
-mod fs;
-pub use fs::*;
+pub mod fs;
 
 /// Gets the parent of this url.
 pub fn url_parent(url: &Url) -> Url {
