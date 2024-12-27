@@ -192,7 +192,7 @@ mod test {
 
   #[test]
   fn test_atomic_write_file() {
-    let sys = RealSys::default();
+    let sys = RealSys;
     let temp_dir = tempfile::tempdir().unwrap();
     let path = temp_dir.path().join("a/b/c");
     atomic_write_file_with_retries(&sys, &path, b"data", 0o644).unwrap();
