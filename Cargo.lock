@@ -28,6 +28,7 @@ checksum = "199c66ffd17ee1a948904d33f3d3f364573951c1f9fb3f859bfe7770bf33862a"
 dependencies = [
  "deno_error_macro",
  "libc",
+ "url",
 ]
 
 [[package]]
@@ -421,9 +422,9 @@ dependencies = [
 
 [[package]]
 name = "sys_traits"
-version = "0.1.0"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72001c0d1b690f17bb18ea7960821389199fd59ce6784f883fc76d0f3fbb6236"
+checksum = "5b46ac05dfbe9fd3a9703eff20e17f5b31e7b6a54daf27a421dcd56c7a27ecdd"
 dependencies = [
  "getrandom",
  "parking_lot",
