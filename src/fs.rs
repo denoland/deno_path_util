@@ -107,7 +107,7 @@ pub fn atomic_write_file<
     data: &[u8],
     mode: u32,
   ) -> std::io::Result<()> {
-    let mut options = OpenOptions::write();
+    let mut options = OpenOptions::new_write();
     options.mode = Some(mode);
     let mut file = sys.fs_open(temp_file_path, &options)?;
     file.write_all(data)?;
