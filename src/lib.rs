@@ -175,7 +175,7 @@ pub fn normalize_path<P: AsRef<Path>>(path: P) -> PathBuf {
   inner(path.as_ref())
 }
 
-#[derive(Debug, Clone, Error, deno_error::JsError)]
+#[derive(Debug, Clone, Error, deno_error::JsError, PartialEq, Eq)]
 #[class(uri)]
 #[error("Could not convert path to URL.\n  Path: {0}")]
 pub struct PathToUrlError(pub PathBuf);
@@ -342,7 +342,7 @@ pub fn specifier_has_uri_scheme(specifier: &str) -> bool {
   }
 }
 
-#[derive(Debug, Clone, Error, JsError)]
+#[derive(Debug, Clone, Error, JsError, PartialEq, Eq)]
 pub enum ResolveUrlOrPathError {
   #[error(transparent)]
   #[class(inherit)]
@@ -719,6 +719,27 @@ mod tests {
     for (specifier, expected_url) in tests {
       let url = resolve_url_or_path(specifier, &cwd).unwrap().to_string();
       assert_eq!(url, expected_url);
+    }
+  }
+
+  #[test]
+  fn test_resolve_url_or_path_deprecated_error() {
+    use url::ParseError::*;
+    use ResolveUrlOrPathError::*;
+
+    let mut tests = vec![
+      ("https://eggplant:b/c", UrlParse(InvalidPort)),
+      ("https://:8080/a/b/c", UrlParse(EmptyHost)),
+    ];
+    if cfg!(target_os = "windows") {
+      let p = r"\\.\c:/stuff/deno/script.ts";
+      tests.push((p, PathToUrl(PathToUrlError(PathBuf::from(p)))));
+    }
+
+    for (specifier, expected_err) in tests {
+      let err =
+        resolve_url_or_path(specifier, &PathBuf::from("/")).unwrap_err();
+      assert_eq!(err, expected_err);
     }
   }
 }
