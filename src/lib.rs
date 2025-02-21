@@ -396,6 +396,26 @@ fn gen_rand_path_component(sys: &impl SystemRandom) -> String {
   })
 }
 
+pub fn is_relative_specifier(specifier: &str) -> bool {
+  let mut specifier_chars = specifier.chars();
+  let Some(first_char) = specifier_chars.next() else {
+    return false;
+  };
+  if first_char != '.' {
+    return false;
+  }
+  let Some(second_char) = specifier_chars.next() else {
+    return true;
+  };
+  if second_char == '/' {
+    return true;
+  }
+  let Some(third_char) = specifier_chars.next() else {
+    return second_char == '.';
+  };
+  second_char == '.' && third_char == '/'
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -741,5 +761,21 @@ mod tests {
         resolve_url_or_path(specifier, &PathBuf::from("/")).unwrap_err();
       assert_eq!(err, expected_err);
     }
+  }
+
+  #[test]
+  fn test_is_relative_specifier() {
+    assert!(is_relative_specifier("."));
+    assert!(is_relative_specifier(".."));
+    assert!(is_relative_specifier("../"));
+    assert!(is_relative_specifier("../test"));
+    assert!(is_relative_specifier("./"));
+    assert!(is_relative_specifier("./test"));
+    assert!(!is_relative_specifier(""));
+    assert!(!is_relative_specifier("a"));
+    assert!(!is_relative_specifier(".test"));
+    assert!(!is_relative_specifier("..test"));
+    assert!(!is_relative_specifier("/test"));
+    assert!(!is_relative_specifier("test"));
   }
 }
