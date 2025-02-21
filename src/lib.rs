@@ -753,6 +753,7 @@ mod tests {
     assert!(!is_relative_specifier(""));
     assert!(!is_relative_specifier("a"));
     assert!(!is_relative_specifier(".test"));
+    assert!(!is_relative_specifier("..test"));
     assert!(!is_relative_specifier("/test"));
     assert!(!is_relative_specifier("test"));
   }
