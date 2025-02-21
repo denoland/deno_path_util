@@ -44,7 +44,7 @@ dependencies = [
 
 [[package]]
 name = "deno_path_util"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "deno_error",
  "percent-encoding",
