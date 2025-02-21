@@ -401,7 +401,6 @@ pub fn is_relative_specifier(specifier: &str) -> bool {
   let Some(first_char) = specifier_chars.next() else {
     return false;
   };
-
   if first_char != '.' {
     return false;
   }
