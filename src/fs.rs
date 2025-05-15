@@ -55,15 +55,13 @@ pub fn canonicalize_path_maybe_not_exists(
   }
 }
 
-pub fn atomic_write_file_with_retries<
-  TSys: FsCreateDirAll
-    + FsMetadata
-    + FsOpen
-    + FsRemoveFile
-    + FsRename
-    + ThreadSleep
-    + SystemRandom,
->(
+#[sys_traits::auto_impl]
+pub trait AtomicWriteFileWithRetriesSys:
+  AtomicWriteFileSys + ThreadSleep
+{
+}
+
+pub fn atomic_write_file_with_retries<TSys: AtomicWriteFileWithRetriesSys>(
   sys: &TSys,
   file_path: &Path,
   data: &[u8],
@@ -86,21 +84,25 @@ pub fn atomic_write_file_with_retries<
   }
 }
 
+#[sys_traits::auto_impl]
+pub trait AtomicWriteFileSys:
+  FsCreateDirAll + FsMetadata + FsOpen + FsRemoveFile + FsRename + SystemRandom
+{
+}
+
 /// Writes the file to the file system at a temporary path, then
 /// renames it to the destination in a single sys call in order
 /// to never leave the file system in a corrupted state.
 ///
 /// This also handles creating the directory if a NotFound error
 /// occurs.
-pub fn atomic_write_file<
-  TSys: FsCreateDirAll + FsMetadata + FsOpen + FsRemoveFile + FsRename + SystemRandom,
->(
+pub fn atomic_write_file<TSys: AtomicWriteFileSys>(
   sys: &TSys,
   file_path: &Path,
   data: &[u8],
   mode: u32,
 ) -> std::io::Result<()> {
-  fn atomic_write_file_raw<TSys: FsOpen + FsRename + FsRemoveFile>(
+  fn atomic_write_file_raw<TSys: AtomicWriteFileSys>(
     sys: &TSys,
     temp_file_path: &Path,
     file_path: &Path,
