@@ -201,20 +201,23 @@ pub struct PathToUrlError(pub PathBuf);
 
 #[allow(clippy::result_unit_err)]
 pub fn url_from_file_path(path: &Path) -> Result<Url, PathToUrlError> {
+  let path = normalize_path(Cow::Borrowed(path));
   #[cfg(any(unix, windows, target_os = "redox", target_os = "wasi"))]
-  return Url::from_file_path(path)
+  return Url::from_file_path(&path)
     .map_err(|()| PathToUrlError(path.to_path_buf()));
   #[cfg(not(any(unix, windows, target_os = "redox", target_os = "wasi")))]
-  url_from_file_path_wasm(path).map_err(|()| PathToUrlError(path.to_path_buf()))
+  url_from_file_path_wasm(&path)
+    .map_err(|()| PathToUrlError(path.to_path_buf()))
 }
 
 #[allow(clippy::result_unit_err)]
 pub fn url_from_directory_path(path: &Path) -> Result<Url, PathToUrlError> {
+  let path = normalize_path(Cow::Borrowed(path));
   #[cfg(any(unix, windows, target_os = "redox", target_os = "wasi"))]
-  return Url::from_directory_path(path)
+  return Url::from_directory_path(&path)
     .map_err(|()| PathToUrlError(path.to_path_buf()));
   #[cfg(not(any(unix, windows, target_os = "redox", target_os = "wasi")))]
-  url_from_directory_path_wasm(path)
+  url_from_directory_path_wasm(&path)
     .map_err(|()| PathToUrlError(path.to_path_buf()))
 }
 
