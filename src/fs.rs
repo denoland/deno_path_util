@@ -1,5 +1,6 @@
-// Copyright 2018-2024 the Deno authors. MIT license.
+// Copyright 2018-2025 the Deno authors. MIT license.
 
+use std::borrow::Cow;
 use std::io::Error;
 use std::io::ErrorKind;
 use std::io::Write;
@@ -29,8 +30,8 @@ pub fn canonicalize_path_maybe_not_exists(
   sys: &impl FsCanonicalize,
   path: &Path,
 ) -> std::io::Result<PathBuf> {
-  let path = normalize_path(path);
-  let mut path = path.as_path();
+  let path = normalize_path(Cow::Borrowed(path));
+  let mut path = path.as_ref();
   let mut names_stack = Vec::new();
   loop {
     match sys.fs_canonicalize(path) {

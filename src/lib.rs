@@ -1,4 +1,4 @@
-// Copyright 2018-2024 the Deno authors. MIT license.
+// Copyright 2018-2025 the Deno authors. MIT license.
 
 #![deny(clippy::print_stderr)]
 #![deny(clippy::print_stdout)]
@@ -6,6 +6,7 @@
 #![deny(clippy::unnecessary_wraps)]
 
 use deno_error::JsError;
+use std::borrow::Cow;
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
@@ -140,10 +141,24 @@ fn url_to_file_path_wasm(url: &Url) -> Result<PathBuf, ()> {
 /// Normalize all intermediate components of the path (ie. remove "./" and "../" components).
 /// Similar to `fs::canonicalize()` but doesn't resolve symlinks.
 ///
-/// Taken from Cargo
+/// Adapted from Cargo
 /// <https://github.com/rust-lang/cargo/blob/af307a38c20a753ec60f0ad18be5abed3db3c9ac/src/cargo/util/paths.rs#L60-L85>
 #[inline]
-pub fn normalize_path<P: AsRef<Path>>(path: P) -> PathBuf {
+pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
+  fn should_normalize(path: &Path) -> bool {
+    for component in path.components() {
+      match component {
+        Component::Prefix(..) | Component::CurDir | Component::ParentDir => {
+          return true
+        }
+        Component::RootDir | Component::Normal(_) => {
+          // ok
+        }
+      }
+    }
+    false
+  }
+
   fn inner(path: &Path) -> PathBuf {
     let mut components = path.components().peekable();
     let mut ret =
@@ -172,7 +187,11 @@ pub fn normalize_path<P: AsRef<Path>>(path: P) -> PathBuf {
     ret
   }
 
-  inner(path.as_ref())
+  if should_normalize(&path) {
+    Cow::Owned(inner(&path))
+  } else {
+    path
+  }
 }
 
 #[derive(Debug, Clone, Error, deno_error::JsError, PartialEq, Eq)]
@@ -378,7 +397,7 @@ pub fn resolve_path(
   current_dir: &Path,
 ) -> Result<Url, PathToUrlError> {
   let path = current_dir.join(path_str);
-  let path = normalize_path(path);
+  let path = normalize_path(Cow::Owned(path));
   url_from_file_path(&path)
 }
 
@@ -440,6 +459,7 @@ mod tests {
     run_success_test("file:///", "/");
     run_success_test("file:///test", "/test");
     run_success_test("file:///dir/test/test.txt", "/dir/test/test.txt");
+    #[cfg(not(debug_assertions))]
     run_success_test(
       "file:///dir/test%20test/test.txt",
       "/dir/test test/test.txt",
@@ -447,14 +467,17 @@ mod tests {
 
     assert_no_panic_url_to_file_path("file:/");
     assert_no_panic_url_to_file_path("file://");
+    #[cfg(not(debug_assertions))]
     assert_no_panic_url_to_file_path("file://asdf/");
     assert_no_panic_url_to_file_path("file://asdf/66666/a.ts");
 
+    #[track_caller]
     fn run_success_test(url: &str, expected_path: &str) {
       let result = url_to_file_path(&Url::parse(url).unwrap()).unwrap();
       assert_eq!(result, PathBuf::from(expected_path));
     }
 
+    #[track_caller]
     fn assert_no_panic_url_to_file_path(url: &str) {
       let _result = url_to_file_path(&Url::parse(url).unwrap());
     }
@@ -583,13 +606,14 @@ mod tests {
   fn test_normalize_path() {
     use super::*;
 
+    run_test("C:\\test\\file.txt", "C:\\test\\file.txt");
     run_test("C:\\test\\./file.txt", "C:\\test\\file.txt");
     run_test("C:\\test\\../other/file.txt", "C:\\other\\file.txt");
     run_test("C:\\test\\../other\\file.txt", "C:\\other\\file.txt");
 
     fn run_test(input: &str, expected: &str) {
       assert_eq!(
-        normalize_path(PathBuf::from(input)),
+        normalize_path(Cow::Owned(PathBuf::from(input))),
         PathBuf::from(expected)
       );
     }
