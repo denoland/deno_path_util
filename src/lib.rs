@@ -400,7 +400,6 @@ pub fn resolve_path(
   current_dir: &Path,
 ) -> Result<Url, PathToUrlError> {
   let path = current_dir.join(path_str);
-  let path = normalize_path(Cow::Owned(path));
   url_from_file_path(&path)
 }
 
