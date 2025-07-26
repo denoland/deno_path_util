@@ -7,6 +7,7 @@
 
 use deno_error::JsError;
 use std::borrow::Cow;
+use std::ffi::OsString;
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
@@ -221,8 +222,46 @@ pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
   if should_normalize(&path) {
     Cow::Owned(inner(&path))
   } else {
-    path
+    ensure_no_trailing_slash(path)
   }
+}
+
+fn ensure_no_trailing_slash(path: Cow<Path>) -> Cow<Path> {
+  let is_windows = sys_traits::impls::is_windows();
+  let mut bytes = path.as_os_str().as_encoded_bytes();
+  let start_len = bytes.len();
+  while bytes.len() > 1
+    && (is_windows && bytes.ends_with(b"\\") || bytes.ends_with(b"/"))
+  {
+    bytes = &bytes[..bytes.len() - 1];
+  }
+
+  if bytes.len() == start_len
+    || bytes.ends_with(b".")
+    || is_windows && bytes.ends_with(b":")
+  {
+    return path;
+  }
+
+  let new_len = bytes.len();
+  let os_string = path.into_owned().into_os_string();
+  Cow::Owned(PathBuf::from(truncate_os_string(os_string, new_len)))
+}
+
+#[cfg(unix)]
+fn truncate_os_string(mut os: OsString, n: usize) -> OsString {
+  use std::os::unix::ffi::OsStringExt;
+  let mut bytes = os.into_vec();
+  bytes.truncate(n);
+  OsString::from_vec(bytes)
+}
+
+#[cfg(windows)]
+fn truncate_os_string(os: OsString, n: usize) -> OsString {
+  use std::os::windows::ffi::OsStrExt;
+  use std::os::windows::ffi::OsStringExt;
+  let wide: Vec<u16> = os.encode_wide().take(n).collect();
+  OsString::from_wide(&wide)
 }
 
 #[derive(Debug, Clone, Error, deno_error::JsError, PartialEq, Eq)]
