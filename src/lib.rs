@@ -7,7 +7,6 @@
 
 use deno_error::JsError;
 use std::borrow::Cow;
-use std::ffi::OsString;
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
@@ -146,32 +145,39 @@ fn url_to_file_path_wasm(url: &Url) -> Result<PathBuf, ()> {
 /// <https://github.com/rust-lang/cargo/blob/af307a38c20a753ec60f0ad18be5abed3db3c9ac/src/cargo/util/paths.rs#L60-L85>
 #[inline]
 pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
-  enum ShouldNormalize {
-    Yes,
-    No,
-    EnsureNoTrailingSlash,
-  }
+  fn should_normalize(path: &Path) -> bool {
+    if path_has_trailing_separator(&path) {
+      return true;
+    }
 
-  fn should_normalize(path: &Path) -> ShouldNormalize {
-    let mut had_normal = false;
     for component in path.components() {
       match component {
         Component::CurDir | Component::ParentDir => {
-          return ShouldNormalize::Yes;
+          return true;
         }
-        Component::Prefix(..) | Component::RootDir => {
+        Component::Prefix(..) | Component::RootDir | Component::Normal(_) => {
           // ok
         }
-        Component::Normal(_) => had_normal = true,
       }
     }
 
-    if path_has_cur_dir_separator(path) {
-      ShouldNormalize::Yes
-    } else if had_normal {
-      ShouldNormalize::EnsureNoTrailingSlash
+    path_has_cur_dir_separator(path)
+  }
+
+  fn path_has_trailing_separator(path: &Path) -> bool {
+    #[cfg(unix)]
+    let raw = std::os::unix::ffi::OsStrExt::as_bytes(path.as_os_str());
+    #[cfg(windows)]
+    let raw = path.as_os_str().as_encoded_bytes();
+    #[cfg(target_arch = "wasm32")]
+    let raw = path.to_string_lossy();
+    #[cfg(target_arch = "wasm32")]
+    let raw = raw.as_bytes();
+
+    if sys_traits::impls::is_windows() {
+      raw.contains(&('/' as u8)) || raw.ends_with(b"\\")
     } else {
-      ShouldNormalize::No
+      raw.ends_with(b"/")
     }
   }
 
@@ -205,29 +211,6 @@ pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
     false
   }
 
-  // Warning: this makes some assumptions like not handling a
-  // path like `/path/../` because it's assumed paths like that
-  // won't be passed here because they'd be normalized by looping
-  // over the components instead.
-  fn ensure_no_trailing_slash(path: Cow<Path>) -> Cow<Path> {
-    let is_windows = sys_traits::impls::is_windows();
-    let mut bytes = path.as_os_str().as_encoded_bytes();
-    let start_len = bytes.len();
-    while bytes.len() > 1
-      && (is_windows && bytes.ends_with(b"\\") || bytes.ends_with(b"/"))
-    {
-      bytes = &bytes[..bytes.len() - 1];
-    }
-
-    if bytes.len() == start_len {
-      return path;
-    }
-
-    let new_len = bytes.len();
-    let os_string = path.into_owned().into_os_string();
-    Cow::Owned(PathBuf::from(truncate_os_string(os_string, new_len)))
-  }
-
   fn inner(path: &Path) -> PathBuf {
     let mut components = path.components().peekable();
     let mut ret =
@@ -256,27 +239,11 @@ pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
     ret
   }
 
-  match should_normalize(&path) {
-    ShouldNormalize::Yes => Cow::Owned(inner(&path)),
-    ShouldNormalize::No => path,
-    ShouldNormalize::EnsureNoTrailingSlash => ensure_no_trailing_slash(path),
+  if should_normalize(&path) {
+    Cow::Owned(inner(&path))
+  } else {
+    path
   }
-}
-
-#[cfg(unix)]
-fn truncate_os_string(mut os: OsString, n: usize) -> OsString {
-  use std::os::unix::ffi::OsStringExt;
-  let mut bytes = os.into_vec();
-  bytes.truncate(n);
-  OsString::from_vec(bytes)
-}
-
-#[cfg(windows)]
-fn truncate_os_string(os: OsString, n: usize) -> OsString {
-  use std::os::windows::ffi::OsStrExt;
-  use std::os::windows::ffi::OsStringExt;
-  let wide: Vec<u16> = os.encode_wide().take(n).collect();
-  OsString::from_wide(&wide)
 }
 
 #[derive(Debug, Clone, Error, deno_error::JsError, PartialEq, Eq)]
