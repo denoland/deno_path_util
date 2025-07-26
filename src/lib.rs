@@ -146,19 +146,33 @@ fn url_to_file_path_wasm(url: &Url) -> Result<PathBuf, ()> {
 /// <https://github.com/rust-lang/cargo/blob/af307a38c20a753ec60f0ad18be5abed3db3c9ac/src/cargo/util/paths.rs#L60-L85>
 #[inline]
 pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
-  fn should_normalize(path: &Path) -> bool {
+  enum ShouldNormalize {
+    Yes,
+    No,
+    EnsureNoTrailingSlash,
+  }
+
+  fn should_normalize(path: &Path) -> ShouldNormalize {
+    let mut had_normal = false;
     for component in path.components() {
       match component {
         Component::CurDir | Component::ParentDir => {
-          return true;
+          return ShouldNormalize::Yes;
         }
-        Component::Prefix(..) | Component::RootDir | Component::Normal(_) => {
+        Component::Prefix(..) | Component::RootDir => {
           // ok
         }
+        Component::Normal(_) => had_normal = true,
       }
     }
 
-    path_has_cur_dir_separator(path)
+    if path_has_cur_dir_separator(path) {
+      ShouldNormalize::Yes
+    } else if had_normal {
+      ShouldNormalize::EnsureNoTrailingSlash
+    } else {
+      ShouldNormalize::No
+    }
   }
 
   // Rust normalizes away `Component::CurDir` most of the time
@@ -191,6 +205,29 @@ pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
     false
   }
 
+  // Warning: this makes some assumptions like not handling a
+  // path like `/path/../` because it's assumed paths like that
+  // won't be passed here because they'd be normalized by looping
+  // over the components instead.
+  fn ensure_no_trailing_slash(path: Cow<Path>) -> Cow<Path> {
+    let is_windows = sys_traits::impls::is_windows();
+    let mut bytes = path.as_os_str().as_encoded_bytes();
+    let start_len = bytes.len();
+    while bytes.len() > 1
+      && (is_windows && bytes.ends_with(b"\\") || bytes.ends_with(b"/"))
+    {
+      bytes = &bytes[..bytes.len() - 1];
+    }
+
+    if bytes.len() == start_len {
+      return path;
+    }
+
+    let new_len = bytes.len();
+    let os_string = path.into_owned().into_os_string();
+    Cow::Owned(PathBuf::from(truncate_os_string(os_string, new_len)))
+  }
+
   fn inner(path: &Path) -> PathBuf {
     let mut components = path.components().peekable();
     let mut ret =
@@ -219,33 +256,11 @@ pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
     ret
   }
 
-  if should_normalize(&path) {
-    Cow::Owned(inner(&path))
-  } else {
-    ensure_no_trailing_slash(path)
+  match should_normalize(&path) {
+    ShouldNormalize::Yes => Cow::Owned(inner(&path)),
+    ShouldNormalize::No => path,
+    ShouldNormalize::EnsureNoTrailingSlash => ensure_no_trailing_slash(path),
   }
-}
-
-fn ensure_no_trailing_slash(path: Cow<Path>) -> Cow<Path> {
-  let is_windows = sys_traits::impls::is_windows();
-  let mut bytes = path.as_os_str().as_encoded_bytes();
-  let start_len = bytes.len();
-  while bytes.len() > 1
-    && (is_windows && bytes.ends_with(b"\\") || bytes.ends_with(b"/"))
-  {
-    bytes = &bytes[..bytes.len() - 1];
-  }
-
-  if bytes.len() == start_len
-    || bytes.ends_with(b".")
-    || is_windows && bytes.ends_with(b":")
-  {
-    return path;
-  }
-
-  let new_len = bytes.len();
-  let os_string = path.into_owned().into_os_string();
-  Cow::Owned(PathBuf::from(truncate_os_string(os_string, new_len)))
 }
 
 #[cfg(unix)]
