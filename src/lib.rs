@@ -186,9 +186,12 @@ pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
   fn path_has_cur_dir_separator(path: &Path) -> bool {
     #[cfg(unix)]
     let raw = std::os::unix::ffi::OsStrExt::as_bytes(path.as_os_str());
-
     #[cfg(windows)]
     let raw = path.as_os_str().as_encoded_bytes();
+    #[cfg(target_arch = "wasm32")]
+    let raw = path.to_string_lossy();
+    #[cfg(target_arch = "wasm32")]
+    let raw = raw.as_bytes();
 
     if sys_traits::impls::is_windows() {
       for window in raw.windows(3) {
