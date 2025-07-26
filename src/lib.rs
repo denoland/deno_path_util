@@ -195,11 +195,7 @@ pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
 
     if sys_traits::impls::is_windows() {
       for window in raw.windows(3) {
-        // check for both /./ and \.\ or any mix of them on windows
-        if matches!(window[0], b'/' | b'\\')
-          && matches!(window[1], b'.')
-          && matches!(window[2], b'/' | b'\\')
-        {
+        if matches!(window, [b'\\', b'.', b'\\']) {
           return true;
         }
       }
