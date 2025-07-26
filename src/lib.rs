@@ -160,6 +160,8 @@ pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
     path_has_cur_dir_separator(path)
   }
 
+  // Rust normalizes away `Component::CurDir` most of the time
+  // so we need to explicitly check for it in the bytes
   fn path_has_cur_dir_separator(path: &Path) -> bool {
     #[cfg(unix)]
     let raw = std::os::unix::ffi::OsStrExt::as_bytes(path.as_os_str());
