@@ -146,7 +146,7 @@ fn url_to_file_path_wasm(url: &Url) -> Result<PathBuf, ()> {
 #[inline]
 pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
   fn should_normalize(path: &Path) -> bool {
-    if path_has_trailing_separator(&path) {
+    if path_has_trailing_separator(path) {
       return true;
     }
 
@@ -175,7 +175,7 @@ pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
     let raw = raw.as_bytes();
 
     if sys_traits::impls::is_windows() {
-      raw.contains(&('/' as u8)) || raw.ends_with(b"\\")
+      raw.contains(&b'/') || raw.ends_with(b"\\")
     } else {
       raw.ends_with(b"/")
     }
