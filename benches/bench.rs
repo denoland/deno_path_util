@@ -8,13 +8,13 @@ fn main() {
   divan::main();
 }
 
-#[divan::bench(sample_size = 512000)]
+#[divan::bench(sample_size = 51200)]
 fn bench_normalize_path_changed(bencher: divan::Bencher) {
   let path = PathBuf::from("/testing/../this/./out/testing/../test");
   bencher.bench(|| normalize_path(Cow::Borrowed(&path)))
 }
 
-#[divan::bench(sample_size = 512000)]
+#[divan::bench(sample_size = 51200)]
 fn bench_normalize_path_no_change(bencher: divan::Bencher) {
   let path = PathBuf::from("/testing/this/out/testing/test");
   bencher.bench(|| normalize_path(Cow::Borrowed(&path)))
