@@ -149,13 +149,39 @@ pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
     for component in path.components() {
       match component {
         Component::Prefix(..) | Component::CurDir | Component::ParentDir => {
-          return true
+          return true;
         }
         Component::RootDir | Component::Normal(_) => {
           // ok
         }
       }
     }
+
+    path_has_cur_dir_separator(path)
+  }
+
+  fn path_has_cur_dir_separator(path: &Path) -> bool {
+    #[cfg(unix)]
+    let raw = std::os::unix::ffi::OsStrExt::as_bytes(path.as_os_str());
+
+    #[cfg(windows)]
+    let raw = path.as_os_str().as_encoded_bytes();
+
+    if sys_traits::impls::is_windows() {
+      for window in raw.windows(3) {
+        // check for both /./ and \.\ on windows
+        if matches!(window, [b'/', b'.', b'/'] | [b'\\', b'.', b'\\']) {
+          return true;
+        }
+      }
+    } else {
+      for window in raw.windows(3) {
+        if matches!(window, [b'/', b'.', b'/']) {
+          return true;
+        }
+      }
+    }
+
     false
   }
 
@@ -603,22 +629,39 @@ mod tests {
     }
   }
 
+  #[test]
+  fn test_normalize_path_basic() {
+    let run_test = run_normalize_path_test;
+    run_test("a/../b", "b");
+    run_test("a/./b/", &PathBuf::from("a").join("b").to_string_lossy());
+    run_test(
+      "a/./b/../c",
+      &PathBuf::from("a").join("c").to_string_lossy(),
+    );
+  }
+
   #[cfg(windows)]
   #[test]
-  fn test_normalize_path() {
-    use super::*;
+  fn test_normalize_path_win() {
+    let run_test = run_normalize_path_test;
 
     run_test("C:\\test\\file.txt", "C:\\test\\file.txt");
     run_test("C:\\test\\./file.txt", "C:\\test\\file.txt");
     run_test("C:\\test\\../other/file.txt", "C:\\other\\file.txt");
     run_test("C:\\test\\../other\\file.txt", "C:\\other\\file.txt");
+    run_test(
+      "C:\\test\\removes_trailing_slash\\",
+      "C:\\test\\removes_trailing_slash",
+    );
+    run_test("C:\\a\\.\\b\\..\\c", "C:\\a\\c");
+  }
 
-    fn run_test(input: &str, expected: &str) {
-      assert_eq!(
-        normalize_path(Cow::Owned(PathBuf::from(input))),
-        PathBuf::from(expected)
-      );
-    }
+  #[track_caller]
+  fn run_normalize_path_test(input: &str, expected: &str) {
+    assert_eq!(
+      normalize_path(Cow::Owned(PathBuf::from(input))).to_string_lossy(),
+      expected
+    );
   }
 
   #[test]
