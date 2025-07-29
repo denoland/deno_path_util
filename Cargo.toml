@@ -13,7 +13,7 @@ repository = "https://github.com/denoland/deno_path_util"
 percent-encoding = "2.3.0"
 thiserror = "2"
 sys_traits.workspace = true
-deno_error = { version = "0.6.0", features = ["url"] }
+deno_error = { version = "0.7.0", features = ["url"] }
 url = "2.5.1"
 
 [dev-dependencies]
