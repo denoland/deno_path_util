@@ -193,6 +193,10 @@ pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
     #[cfg(target_arch = "wasm32")]
     let raw = raw.as_bytes();
 
+    if raw.ends_with(b"\\.") || raw.ends_with(b"/.") {
+      return true;
+    }
+
     if sys_traits::impls::is_windows() {
       for window in raw.windows(3) {
         if matches!(window, [b'\\', b'.', b'\\']) {
@@ -679,6 +683,7 @@ mod tests {
       "C:\\test\\removes_trailing_slash",
     );
     run_test("C:\\a\\.\\b\\..\\c", "C:\\a\\c");
+    run_test("C:\\test\\.", "C:\\test");
   }
 
   #[track_caller]
