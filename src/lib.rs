@@ -465,7 +465,7 @@ pub enum SpecifierError {
   #[error(
     "Relative import path \"{specifier}\" not prefixed with / or ./ or ../"
   )]
-  ImportPrefixMissing { specifier: String, referrer: Url },
+  ImportPrefixMissing { specifier: String },
 }
 
 /// Given a specifier string and a referring module specifier, try to resolve
@@ -479,7 +479,7 @@ pub fn resolve_import(
 ) -> Result<Url, SpecifierError> {
   match Url::parse(specifier) {
     // 1. Apply the URL parser to specifier.
-    //    If the result is not failure, return he result.
+    //    If the result is not failure, return the result.
     Ok(url) => Ok(url),
 
     // 2. If specifier does not start with the character U+002F SOLIDUS (/),
@@ -493,7 +493,6 @@ pub fn resolve_import(
     {
       Err(SpecifierError::ImportPrefixMissing {
         specifier: specifier.to_string(),
-        referrer: referrer.clone(),
       })
     }
 
@@ -961,12 +960,8 @@ mod tests {
 
     match resolve_import("test.js", &Url::parse("https://example.com").unwrap())
     {
-      Err(SpecifierError::ImportPrefixMissing {
-        specifier,
-        referrer,
-      }) => {
+      Err(SpecifierError::ImportPrefixMissing { specifier }) => {
         assert_eq!(specifier, "test.js");
-        assert_eq!(referrer.as_str(), "https://example.com/")
       }
       _ => unreachable!(),
     }
