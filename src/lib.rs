@@ -463,7 +463,7 @@ pub enum SpecifierError {
   InvalidUrl(url::ParseError),
   #[class(type)]
   #[error(
-    "Relative import path \"{specifier}\" not prefixed with / or ./ or ../"
+    "Import \"{specifier}\" not a dependency"
   )]
   ImportPrefixMissing { specifier: String },
 }
