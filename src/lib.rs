@@ -458,6 +458,60 @@ pub fn resolve_path(
   url_from_file_path(&path)
 }
 
+#[derive(Debug, Error, Clone, PartialEq, Eq, deno_error::JsError)]
+pub enum SpecifierError {
+  // don't make this error a source because it's short
+  // and that causes unnecessary verbosity
+  #[class(inherit)]
+  #[error("invalid URL: {0}")]
+  InvalidUrl(url::ParseError),
+  #[class(type)]
+  #[error("Import \"{specifier}\" not a dependency")]
+  ImportPrefixMissing { specifier: String },
+}
+
+/// Given a specifier string and a referring module specifier, try to resolve
+/// the target module specifier, erroring if it cannot be resolved.
+///
+/// This function is useful for resolving specifiers in situations without an
+/// import map.
+pub fn resolve_import(
+  specifier: &str,
+  referrer: &Url,
+) -> Result<Url, SpecifierError> {
+  match Url::parse(specifier) {
+    // 1. Apply the URL parser to specifier.
+    //    If the result is not failure, return the result.
+    Ok(url) => Ok(url),
+
+    // 2. If specifier does not start with the character U+002F SOLIDUS (/),
+    //    the two-character sequence U+002E FULL STOP, U+002F SOLIDUS (./),
+    //    or the three-character sequence U+002E FULL STOP, U+002E FULL STOP,
+    //    U+002F SOLIDUS (../), return failure.
+    Err(url::ParseError::RelativeUrlWithoutBase)
+      if !(specifier.starts_with('/')
+        || specifier.starts_with("./")
+        || specifier.starts_with("../")) =>
+    {
+      Err(SpecifierError::ImportPrefixMissing {
+        specifier: specifier.to_string(),
+      })
+    }
+
+    // 3. Return the result of applying the URL parser to specifier with base
+    //    URL as the base URL.
+    Err(url::ParseError::RelativeUrlWithoutBase) => {
+      referrer.join(specifier).map_err(SpecifierError::InvalidUrl)
+    }
+
+    // If parsing the specifier as a URL failed for a different reason than
+    // it being relative, always return the original error. We don't want to
+    // return `ImportPrefixMissing` or `InvalidBaseUrl` if the real
+    // problem lies somewhere else.
+    Err(err) => Err(SpecifierError::InvalidUrl(err)),
+  }
+}
+
 pub fn get_atomic_path(sys: &impl SystemRandom, path: &Path) -> PathBuf {
   let rand = gen_rand_path_component(sys);
   let extension = format!("{rand}.tmp");
@@ -876,5 +930,43 @@ mod tests {
     assert!(!is_relative_specifier("..test"));
     assert!(!is_relative_specifier("/test"));
     assert!(!is_relative_specifier("test"));
+  }
+
+  #[test]
+  fn test_resolve_import() {
+    fn run_test(specifier: &str, base: &str, expected: &str) {
+      let actual =
+        resolve_import(specifier, &Url::parse(base).unwrap()).unwrap();
+      assert_eq!(actual.as_str(), expected);
+    }
+
+    run_test(
+      "./test.js",
+      "https://example.com",
+      "https://example.com/test.js",
+    );
+    run_test(
+      "https://deno.land/x/mod.ts",
+      "https://example.com",
+      "https://deno.land/x/mod.ts",
+    );
+    run_test(
+      "../test.js",
+      "https://example.com/sub",
+      "https://example.com/test.js",
+    );
+    run_test(
+      "/test.js",
+      "https://example.com/sub/dir/test",
+      "https://example.com/test.js",
+    );
+
+    match resolve_import("test.js", &Url::parse("https://example.com").unwrap())
+    {
+      Err(SpecifierError::ImportPrefixMissing { specifier }) => {
+        assert_eq!(specifier, "test.js");
+      }
+      _ => unreachable!(),
+    }
   }
 }
