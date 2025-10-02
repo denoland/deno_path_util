@@ -462,9 +462,7 @@ pub enum SpecifierError {
   #[error("invalid URL: {0}")]
   InvalidUrl(url::ParseError),
   #[class(type)]
-  #[error(
-    "Import \"{specifier}\" not a dependency"
-  )]
+  #[error("Import \"{specifier}\" not a dependency")]
   ImportPrefixMissing { specifier: String },
 }
 
