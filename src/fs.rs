@@ -1,6 +1,5 @@
 // Copyright 2018-2025 the Deno authors. MIT license.
 
-use std::borrow::Cow;
 use std::io::Error;
 use std::io::ErrorKind;
 use std::io::Write;
@@ -18,7 +17,6 @@ use sys_traits::SystemRandom;
 use sys_traits::ThreadSleep;
 
 use crate::get_atomic_path;
-use crate::normalize_path;
 
 /// Canonicalizes a path which might be non-existent by going up the
 /// ancestors until it finds a directory that exists, canonicalizes
@@ -28,10 +26,8 @@ use crate::normalize_path;
 /// subsequently be created along this path by some other code.
 pub fn canonicalize_path_maybe_not_exists(
   sys: &impl FsCanonicalize,
-  path: &Path,
+  mut path: &Path,
 ) -> std::io::Result<PathBuf> {
-  let path = normalize_path(Cow::Borrowed(path));
-  let mut path = path.as_ref();
   let mut names_stack = Vec::new();
   loop {
     match sys.fs_canonicalize(path) {
@@ -47,6 +43,12 @@ pub fn canonicalize_path_maybe_not_exists(
           None => return Err(err),
         });
         path = match path.parent() {
+          // When the provided path is a relative path (e.g. `foo/bar.txt`),
+          // `path.parent()` ends up being the empty string as documented in
+          // `std::path::Path::parent()` after going up the ancestor path.
+          // In this case, we return a path concatenating the current path with
+          // the provided path i.e. `{cwd}/foo/bar.txt`.
+          Some(parent) if parent.as_os_str().is_empty() => Path::new("."),
           Some(parent) => parent,
           None => return Err(err),
         };
@@ -168,6 +170,7 @@ fn add_file_context_to_err(file_path: &Path, err: Error) -> Error {
 
 #[cfg(test)]
 mod test {
+  use std::path::Path;
   use std::path::PathBuf;
 
   use sys_traits::impls::InMemorySys;
@@ -175,22 +178,88 @@ mod test {
   use sys_traits::EnvSetCurrentDir;
   use sys_traits::FsCreateDirAll;
   use sys_traits::FsRead;
+  use sys_traits::FsSymlinkDir;
 
   use super::atomic_write_file_with_retries;
   use super::canonicalize_path_maybe_not_exists;
 
   #[test]
-  fn test_canonicalize_path_maybe_not_exists() {
+  fn test_canonicalize_path_maybe_not_exists_in_memory() {
     let sys = InMemorySys::default();
+
+    // .
+    // └── a
+    //     └── b (cwd)
+    //         └── c
     sys.fs_create_dir_all("/a/b/c").unwrap();
     sys.env_set_current_dir("/a/b").unwrap();
+
+    let path = canonicalize_path_maybe_not_exists(&sys, Path::new("")).unwrap();
+    assert_eq!(path, PathBuf::from("/a/b"));
     let path =
-      canonicalize_path_maybe_not_exists(&sys, &PathBuf::from("./c")).unwrap();
+      canonicalize_path_maybe_not_exists(&sys, Path::new(".")).unwrap();
+    assert_eq!(path, PathBuf::from("/a/b"));
+    let path =
+      canonicalize_path_maybe_not_exists(&sys, Path::new("d")).unwrap();
+    assert_eq!(path, PathBuf::from("/a/b/d"));
+    let path =
+      canonicalize_path_maybe_not_exists(&sys, Path::new("./d")).unwrap();
+    assert_eq!(path, PathBuf::from("/a/b/d"));
+    let path =
+      canonicalize_path_maybe_not_exists(&sys, Path::new("c")).unwrap();
     assert_eq!(path, PathBuf::from("/a/b/c"));
     let path =
-      canonicalize_path_maybe_not_exists(&sys, &PathBuf::from("./c/d/e"))
-        .unwrap();
+      canonicalize_path_maybe_not_exists(&sys, Path::new("./c")).unwrap();
+    assert_eq!(path, PathBuf::from("/a/b/c"));
+    let path =
+      canonicalize_path_maybe_not_exists(&sys, Path::new("c/d/e")).unwrap();
     assert_eq!(path, PathBuf::from("/a/b/c/d/e"));
+    let path =
+      canonicalize_path_maybe_not_exists(&sys, Path::new("./c/d/e")).unwrap();
+    assert_eq!(path, PathBuf::from("/a/b/c/d/e"));
+  }
+
+  #[test]
+  fn test_canonicalize_path_maybe_not_exists_real() {
+    let sys = RealSys;
+    let temp_dir = tempfile::tempdir().unwrap();
+
+    // .
+    // ├── a
+    // │   └── b
+    // │       └── c
+    // └── link -> a/b/c (cwd)
+    sys
+      .fs_create_dir_all(temp_dir.path().join("a/b/c"))
+      .unwrap();
+    sys
+      .fs_symlink_dir(
+        temp_dir.path().join("a/b/c"),
+        temp_dir.path().join("link"),
+      )
+      .unwrap();
+    let cwd = temp_dir.path().join("link");
+    sys.env_set_current_dir(&cwd).unwrap();
+
+    let path =
+      canonicalize_path_maybe_not_exists(&sys, Path::new(".")).unwrap();
+    assert_eq!(path, temp_dir.path().join("a/b/c"));
+
+    let path =
+      canonicalize_path_maybe_not_exists(&sys, &PathBuf::from("d")).unwrap();
+    assert_eq!(path, temp_dir.path().join("a/b/c/d"));
+
+    let path =
+      canonicalize_path_maybe_not_exists(&sys, Path::new("./d")).unwrap();
+    assert_eq!(path, temp_dir.path().join("a/b/c/d"));
+
+    let path =
+      canonicalize_path_maybe_not_exists(&sys, Path::new("d/e")).unwrap();
+    assert_eq!(path, temp_dir.path().join("a/b/c/d/e"));
+
+    let path =
+      canonicalize_path_maybe_not_exists(&sys, Path::new("./d/e")).unwrap();
+    assert_eq!(path, temp_dir.path().join("a/b/c/d/e"));
   }
 
   #[test]
