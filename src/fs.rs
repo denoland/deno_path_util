@@ -227,8 +227,8 @@ mod test {
 
     // .
     // ├── a
-    // │   └── b
-    // │       └── c
+    // │   └── b
+    // │       └── c
     // └── link -> a/b/c (cwd)
     sys
       .fs_create_dir_all(temp_dir.path().join("a/b/c"))
