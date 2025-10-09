@@ -46,8 +46,9 @@ pub fn canonicalize_path_maybe_not_exists(
           // When the provided path is a relative path (e.g. `foo/bar.txt`),
           // `path.parent()` ends up being the empty string as documented in
           // `std::path::Path::parent()` after going up the ancestor path.
-          // In this case, we return a path concatenating the current path with
-          // the provided path i.e. `{cwd}/foo/bar.txt`.
+          // In this case, what this function should return is a path joining
+          // the current path with the provided path i.e. `{cwd}/foo/bar.txt`,
+          // so we set `path` to `.` to indicate the current directory.
           Some(parent) if parent.as_os_str().is_empty() => Path::new("."),
           Some(parent) => parent,
           None => return Err(err),
