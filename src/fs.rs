@@ -176,6 +176,7 @@ mod test {
 
   use sys_traits::impls::InMemorySys;
   use sys_traits::impls::RealSys;
+  use sys_traits::EnvCurrentDir;
   use sys_traits::EnvSetCurrentDir;
   use sys_traits::FsCanonicalize;
   use sys_traits::FsCreateDirAll;
@@ -221,10 +222,16 @@ mod test {
     assert_eq!(path, PathBuf::from("/a/b/c/d/e"));
   }
 
+  // Note: this test mutates the current working directory. Although it will be
+  // restored at the end, if other tests relying on the cwd are run in parallel
+  // to this test, they may fail.
   #[test]
   fn test_canonicalize_path_maybe_not_exists_real() {
     let sys = RealSys;
     let temp_dir = tempfile::tempdir().unwrap();
+
+    // Save the original working directory to restore it later
+    let original_cwd = sys.env_current_dir().unwrap();
 
     // .
     // ├── a
@@ -265,6 +272,9 @@ mod test {
     let path =
       canonicalize_path_maybe_not_exists(&sys, Path::new("./d/e")).unwrap();
     assert_eq!(path, canonicalized_temp_dir_path.join("a/b/c/d/e"));
+
+    // Restore the original working directory
+    sys.env_set_current_dir(&original_cwd).unwrap();
   }
 
   #[test]
