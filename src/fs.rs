@@ -177,6 +177,7 @@ mod test {
   use sys_traits::impls::InMemorySys;
   use sys_traits::impls::RealSys;
   use sys_traits::EnvSetCurrentDir;
+  use sys_traits::FsCanonicalize;
   use sys_traits::FsCreateDirAll;
   use sys_traits::FsRead;
   use sys_traits::FsSymlinkDir;
@@ -242,25 +243,28 @@ mod test {
     let cwd = temp_dir.path().join("link");
     sys.env_set_current_dir(&cwd).unwrap();
 
+    let canonicalized_temp_dir_path =
+      sys.fs_canonicalize(temp_dir.path()).unwrap();
+
     let path =
       canonicalize_path_maybe_not_exists(&sys, Path::new(".")).unwrap();
-    assert_eq!(path, temp_dir.path().join("a/b/c"));
+    assert_eq!(path, canonicalized_temp_dir_path.join("a/b/c"));
 
     let path =
       canonicalize_path_maybe_not_exists(&sys, &PathBuf::from("d")).unwrap();
-    assert_eq!(path, temp_dir.path().join("a/b/c/d"));
+    assert_eq!(path, canonicalized_temp_dir_path.join("a/b/c/d"));
 
     let path =
       canonicalize_path_maybe_not_exists(&sys, Path::new("./d")).unwrap();
-    assert_eq!(path, temp_dir.path().join("a/b/c/d"));
+    assert_eq!(path, canonicalized_temp_dir_path.join("a/b/c/d"));
 
     let path =
       canonicalize_path_maybe_not_exists(&sys, Path::new("d/e")).unwrap();
-    assert_eq!(path, temp_dir.path().join("a/b/c/d/e"));
+    assert_eq!(path, canonicalized_temp_dir_path.join("a/b/c/d/e"));
 
     let path =
       canonicalize_path_maybe_not_exists(&sys, Path::new("./d/e")).unwrap();
-    assert_eq!(path, temp_dir.path().join("a/b/c/d/e"));
+    assert_eq!(path, canonicalized_temp_dir_path.join("a/b/c/d/e"));
   }
 
   #[test]
