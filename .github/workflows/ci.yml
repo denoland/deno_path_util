@@ -36,15 +36,17 @@ jobs:
         if: contains(matrix.os, 'ubuntu')
         run: |
           cargo fmt -- --check
-      
+
       - name: Check builds Wasm
         if: contains(matrix.os, 'ubuntu')
         run: |
           rustup target add wasm32-unknown-unknown
           cargo check --all-features --target wasm32-unknown-unknown
 
+      # Some tests mutate the current working directory while some others rely
+      # on it; we run them sequentially to avoid flakiness.
       - name: Cargo test
-        run: cargo test --locked --release --all-features --bins --tests --examples
+        run: cargo test --locked --release --all-features --bins --tests --examples -- --test-threads=1
 
       - name: Lint
         if: contains(matrix.os, 'ubuntu')
