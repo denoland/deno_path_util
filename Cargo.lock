@@ -82,7 +82,7 @@ dependencies = [
 
 [[package]]
 name = "deno_path_util"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "deno_error",
  "divan",
