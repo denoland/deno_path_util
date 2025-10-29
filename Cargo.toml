@@ -2,7 +2,7 @@
 name = "deno_path_util"
 description = "Path utilities used in Deno"
 version = "0.6.3"
-edition = "2021"
+edition = "2024"
 authors = ["the Deno authors"]
 license = "MIT"
 repository = "https://github.com/denoland/deno_path_util"
