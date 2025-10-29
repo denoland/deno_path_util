@@ -267,7 +267,7 @@ pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
                 let trimmed = std::ffi::OsString::from_wide(&wide[..end]);
                 ret.push(trimmed);
               }
-              /// SAFETY: trimmed spaces and dots only
+              // SAFETY: trimmed spaces and dots only
               #[cfg(not(windows))]
               unsafe {
                 let trimmed =
