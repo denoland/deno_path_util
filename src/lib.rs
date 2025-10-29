@@ -11,6 +11,7 @@ use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 use sys_traits::SystemRandom;
+use sys_traits::impls::is_windows;
 use thiserror::Error;
 use url::Url;
 
@@ -150,14 +151,27 @@ pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
       return true;
     }
 
+    let mut last_part = None;
     for component in path.components() {
       match component {
         Component::CurDir | Component::ParentDir => {
           return true;
         }
-        Component::Prefix(..) | Component::RootDir | Component::Normal(_) => {
+        Component::Prefix(..) | Component::RootDir => {
           // ok
         }
+        Component::Normal(component) => {
+          last_part = Some(component);
+        }
+      }
+    }
+
+    if is_windows()
+      && let Some(last_part) = last_part
+    {
+      let bytes = last_part.as_encoded_bytes();
+      if bytes.ends_with(b".") || bytes.ends_with(b" ") {
+        return true;
       }
     }
 
@@ -235,7 +249,35 @@ pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
           ret.pop();
         }
         Component::Normal(c) => {
-          ret.push(c);
+          if is_windows() {
+            let bytes = c.as_encoded_bytes();
+            // Strip trailing dots and spaces on Windows
+            let mut end = bytes.len();
+            while end > 0 && (bytes[end - 1] == b'.' || bytes[end - 1] == b' ')
+            {
+              end -= 1;
+            }
+            if end == bytes.len() {
+              ret.push(c);
+            } else if end > 0 {
+              #[cfg(windows)]
+              {
+                use std::os::windows::ffi::{OsStrExt, OsStringExt};
+                let wide: Vec<u16> = c.encode_wide().collect();
+                let trimmed = std::ffi::OsString::from_wide(&wide[..end]);
+                ret.push(trimmed);
+              }
+              // SAFETY: trimmed spaces and dots only
+              #[cfg(not(windows))]
+              unsafe {
+                let trimmed =
+                  std::ffi::OsStr::from_encoded_bytes_unchecked(&bytes[..end]);
+                ret.push(trimmed);
+              }
+            }
+          } else {
+            ret.push(c);
+          }
         }
       }
     }
@@ -299,19 +341,18 @@ fn url_from_file_path_wasm(path: &Path) -> Result<Url, ()> {
   if path_str.contains('\\') {
     let mut url = Url::parse("file://").unwrap();
     if let Some(next) = path_str.strip_prefix(r#"\\?\UNC\"#) {
-      if let Some((host, rest)) = next.split_once('\\') {
-        if url.set_host(Some(host)).is_ok() {
-          path_str = rest.to_string().into();
-        }
+      if let Some((host, rest)) = next.split_once('\\')
+        && url.set_host(Some(host)).is_ok()
+      {
+        path_str = rest.to_string().into();
       }
     } else if let Some(next) = path_str.strip_prefix(r#"\\?\"#) {
       path_str = next.to_string().into();
-    } else if let Some(next) = path_str.strip_prefix(r#"\\"#) {
-      if let Some((host, rest)) = next.split_once('\\') {
-        if url.set_host(Some(host)).is_ok() {
-          path_str = rest.to_string().into();
-        }
-      }
+    } else if let Some(next) = path_str.strip_prefix(r#"\\"#)
+      && let Some((host, rest)) = next.split_once('\\')
+      && url.set_host(Some(host)).is_ok()
+    {
+      path_str = rest.to_string().into();
     }
 
     for component in path_str.split('\\') {
@@ -738,6 +779,8 @@ mod tests {
     );
     run_test("C:\\a\\.\\b\\..\\c", "C:\\a\\c");
     run_test("C:\\test\\.", "C:\\test");
+    run_test("C:\\test\\test...", "C:\\test\\test");
+    run_test("C:\\test\\test    ", "C:\\test\\test");
   }
 
   #[track_caller]
@@ -897,8 +940,8 @@ mod tests {
 
   #[test]
   fn test_resolve_url_or_path_deprecated_error() {
-    use url::ParseError::*;
     use ResolveUrlOrPathError::*;
+    use url::ParseError::*;
 
     let mut tests = vec![
       ("https://eggplant:b/c", UrlParse(InvalidPort)),
