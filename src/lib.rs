@@ -342,16 +342,18 @@ fn url_from_file_path_wasm(path: &Path) -> Result<Url, ()> {
     let mut url = Url::parse("file://").unwrap();
     if let Some(next) = path_str.strip_prefix(r#"\\?\UNC\"#) {
       if let Some((host, rest)) = next.split_once('\\')
-        && url.set_host(Some(host)).is_ok() {
-          path_str = rest.to_string().into();
-        }
+        && url.set_host(Some(host)).is_ok()
+      {
+        path_str = rest.to_string().into();
+      }
     } else if let Some(next) = path_str.strip_prefix(r#"\\?\"#) {
       path_str = next.to_string().into();
     } else if let Some(next) = path_str.strip_prefix(r#"\\"#)
       && let Some((host, rest)) = next.split_once('\\')
-        && url.set_host(Some(host)).is_ok() {
-          path_str = rest.to_string().into();
-        }
+      && url.set_host(Some(host)).is_ok()
+    {
+      path_str = rest.to_string().into();
+    }
 
     for component in path_str.split('\\') {
       url.path_segments_mut().unwrap().push(component);
