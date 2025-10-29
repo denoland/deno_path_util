@@ -174,14 +174,14 @@ mod test {
   use std::path::Path;
   use std::path::PathBuf;
 
-  use sys_traits::impls::InMemorySys;
-  use sys_traits::impls::RealSys;
   use sys_traits::EnvCurrentDir;
   use sys_traits::EnvSetCurrentDir;
   use sys_traits::FsCanonicalize;
   use sys_traits::FsCreateDirAll;
   use sys_traits::FsRead;
   use sys_traits::FsSymlinkDir;
+  use sys_traits::impls::InMemorySys;
+  use sys_traits::impls::RealSys;
 
   use super::atomic_write_file_with_retries;
   use super::canonicalize_path_maybe_not_exists;

@@ -253,7 +253,8 @@ pub fn normalize_path(path: Cow<Path>) -> Cow<Path> {
             let bytes = c.as_encoded_bytes();
             // Strip trailing dots and spaces on Windows
             let mut end = bytes.len();
-            while end > 0 && (bytes[end - 1] == b'.' || bytes[end - 1] == b' ') {
+            while end > 0 && (bytes[end - 1] == b'.' || bytes[end - 1] == b' ')
+            {
               end -= 1;
             }
             if end == bytes.len() {
